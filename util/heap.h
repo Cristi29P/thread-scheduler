@@ -9,9 +9,7 @@
 #ifndef HEAP_H
 #define HEAP_H
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+#include "utils.h"
 
 #define GO_UP(x)        (((x) - 1) >> 1)
 #define GO_LEFT(x)      (((x) << 1) + 1)

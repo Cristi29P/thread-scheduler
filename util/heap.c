@@ -1,6 +1,6 @@
 /**
  * Credits:
- *  SD, 2020
+ * SD, 2020
  * 
  * Lab #9, BST & Heap
  * 
@@ -9,7 +9,6 @@
  */
 
 #include "heap.h"
-#include "utils.h"
 
 heap_t *heap_create(int (*cmp_f) (const void *, const void *), void (*free_func) (const void *), const size_t value_size)
 {
@@ -25,7 +24,7 @@ heap_t *heap_create(int (*cmp_f) (const void *, const void *), void (*free_func)
 	heap->value_size = value_size;
 	
 	heap->arr = calloc(heap->capacity, value_size);
-	DIE(!heap->arr, "heap->arr calloc.");
+	DIE(!heap->arr, "heap->arr calloc");
 
 	return heap;
 }
@@ -45,7 +44,7 @@ void heap_insert_fix(heap_t *heap, int pos) {
 }
 
 
-void swap(void  *v1, void  *v2, size_t  size)  {
+void swap(void  *v1, void  *v2, size_t size)  {
     void *temp = calloc(1, size);
     DIE(!temp, "Temp calloc failed!");
 
@@ -65,7 +64,7 @@ void heap_insert(heap_t *heap, void *element)
 
 	heap_insert_fix(heap, heap->size);
 
-	heap->size++;
+	++heap->size;
 	if (heap->size == heap->capacity) {
 		heap->capacity *= 2;
 

@@ -21,7 +21,7 @@ struct heap_t {
     void **arr;
 
     /* Effective size, capacity and size of values stored */
-    size_t size, capacity, value_size;
+    size_t size, capacity;
 
     /* Function used for comparing the keys */
     int	(*cmp)(const void *key1, const void *key2);
@@ -36,15 +36,13 @@ struct heap_t {
  * @free_func: pointer to a function used for freeing an element
  * @return: pointer to the newly created heap
  */
-heap_t *heap_create(int (*cmp_f) (const void *, const void *), void (*free_func) (const void *), const size_t value_size);
-
+heap_t *heap_create(int (*cmp_f) (const void *, const void *), void (*free_func) (const void *));
 /**
  * Insert a new element in a heap
  * @heap: the heap where to insert the new element
  * @element: the element to be inserted in heap
  */
 void heap_insert(heap_t *heap, void *element);
-
 /**
  * Get the top element
  * @heap: the heap where to search for the top element
@@ -67,8 +65,7 @@ int heap_empty(heap_t *heap);
 /**
  * Free a heap
  * @heap: the heap to be freed
- * @free_func: the function used for freeing an elements memory
  */
-void heap_free(heap_t *heap, void (*free_func) (const void *));
+void heap_free(heap_t *heap);
 
 #endif /* HEAP_H */

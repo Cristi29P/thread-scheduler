@@ -12,3 +12,4 @@ checker-lin/libscheduler.so
 checker-lin/_log
 util/valgrind-out.txt
 util/valgrind-out.txt
+.vscode/settings.json

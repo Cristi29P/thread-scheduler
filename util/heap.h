@@ -6,13 +6,10 @@
  * Heap structure and function definitions
  */
 
-#ifndef __HEAP_H_
-#define __HEAP_H_
+#ifndef HEAP_H_
+#define HEAP_H_
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-
+#include "utils.h"
 
 #define GO_UP(x)        (((x) - 1) >> 1)
 #define GO_LEFT(x)      (((x) << 1) + 1)
@@ -22,18 +19,18 @@ typedef struct heap_t heap_t;
 struct heap_t {
     /* heap elements */
     void **arr;
-
+    /* number of elements in the heap, initial capacity */
     int size, capacity;
-
     /* function used for sorting the keys */
     int	(*cmp)(const void *a, const void *b);
-
+    /* function used for freeing up internal structure stored in heap */
     void (*inner_free)(const void *);
 };
 
 /**
  * Alloc memory for a new heap
  * @cmp_f: pointer to a function used for sorting
+ * @capacity: initial heap capacity
  * @return: pointer to the newly created heap
  */
 heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (const void *), size_t capacity);
@@ -48,12 +45,13 @@ void heap_insert(heap_t *heap, void *val);
 /**
  * Get the top element
  * @heap: the heap where to search for the top element
- * @return: the top element
+ * @return: top element pointer
  */
 void* heap_top(heap_t *heap);
 
 /**
  * Remove the top element
+ * @heap: the heap where to remove the first element from
  */
 void heap_pop(heap_t *heap);
 
@@ -65,9 +63,16 @@ void heap_pop(heap_t *heap);
 int heap_empty(heap_t *heap);
 
 /**
+ * Return number of values stored inside the heap
+ * @heap: the heap to be checked
+ * @return: the number of values
+ */
+int heap_size(heap_t *heap);
+
+/**
  * Free a heap
  * @heap: the heap to be freed
  */
 void heap_free(heap_t *heap);
 
-#endif
+#endif /* HEAP_H_ */

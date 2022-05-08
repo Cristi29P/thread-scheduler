@@ -103,6 +103,11 @@ int heap_empty(heap_t *heap)
 	return heap->size <= 0;
 }
 
+int heap_size(heap_t *heap)
+{
+	return heap->size;
+}
+
 void heap_free(heap_t *heap)
 {
 	for(int i = 0; i < heap->size; i++) {

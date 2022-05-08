@@ -4,8 +4,8 @@
  * https://ocw.cs.pub.ro/courses/so/laboratoare/resurse/die
  */
 
-#ifndef __UTILS_H_
-#define __UTILS_H_
+#ifndef UTILS_H_
+#define UTILS_H_
 
 #include <stdlib.h>
 #include <string.h>
@@ -23,4 +23,4 @@
 		}							\
 	} while (0)
 
-#endif
+#endif /* UTILS_H_ */

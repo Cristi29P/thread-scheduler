@@ -45,7 +45,7 @@ void heap_insert(heap_t *heap, void *val);
 /**
  * Get the top element
  * @heap: the heap where to search for the top element
- * @return: top element pointer
+ * @return: top element pointer, NULL on error
  */
 void* heap_top(heap_t *heap);
 
@@ -58,14 +58,14 @@ void heap_pop(heap_t *heap);
 /**
  * Check if the heap is empty
  * @heap: the heap to be checked
- * @return: 1 if the heap is empty else 0
+ * @return: 1 if the heap is empty else 0, -1 on error
  */
 int heap_empty(heap_t *heap);
 
 /**
  * Return number of values stored inside the heap
  * @heap: the heap to be checked
- * @return: the number of values
+ * @return: the number of values or -1 if error
  */
 int heap_size(heap_t *heap);
 

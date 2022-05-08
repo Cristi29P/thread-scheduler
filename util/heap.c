@@ -7,26 +7,33 @@
  */
 
 #include "heap.h"
-#include "utils.h"
 
 heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (const void *), size_t capacity)
 {
 	heap_t *heap;
 
 	heap = calloc(1, sizeof(heap_t));
-	DIE(heap == NULL, "heap malloc");
+	DIE(!heap, "heap calloc failed!");
 
-	heap->cmp       = cmp_f;
+	DIE(!cmp_f, "NULL pointer to cmp_f not allowed!");
+	heap->cmp        = cmp_f;
+
+	DIE(!inner_free, "NULL pointer to inner_free not allowed!");
 	heap->inner_free = inner_free;
-	heap->size      = 0;
-	heap->capacity  = (int)capacity;
-	heap->arr       = calloc(heap->capacity, sizeof(void *));
-	DIE(heap->arr == NULL, "heap->arr malloc");
+
+	heap->size       = 0;
+
+	DIE(capacity <= 0, "Capacity must be greater than 0!");
+	heap->capacity   = (int)capacity;
+
+	heap->arr        = calloc(heap->capacity, sizeof(void *));
+	DIE(!(heap->arr), "heap->arr calloc failed!");
 
 	return heap;
 }
 
-static void __heap_insert_fix(heap_t *heap, int pos) {
+void heap_insert_fix(heap_t *heap, int pos)
+{
 	void *aux;
 	int p = GO_UP(pos);
 
@@ -40,45 +47,47 @@ static void __heap_insert_fix(heap_t *heap, int pos) {
 	}
 }
 
-
 void heap_insert(heap_t *heap, void *val)
 {
+	if (!heap || !(heap->arr) || !val) {
+		fprintf(stderr, "Invalid insert parameter. One or more is NULL!");
+		return;
+	}
+
 	heap->arr[heap->size] = val;
 
-	__heap_insert_fix(heap, heap->size);
+	heap_insert_fix(heap, heap->size);
 
-	heap->size++;
+	++heap->size;
 	if (heap->size == heap->capacity) {
 		heap->capacity *= 2;
 
 		heap->arr = realloc(heap->arr, heap->capacity * sizeof(void *));
-		DIE(heap->arr == NULL, "heap->arr realloc");
+		DIE(!(heap->arr), "heap->arr realloc");
 	}
 }
 
 void* heap_top(heap_t *heap)
 {
-	return heap->arr[0];
+	return heap ? heap->arr[0] : NULL;
 }
 
-static void __heap_pop_fix(heap_t *heap, int pos) {
-	int l = GO_LEFT(pos);
-	int r = GO_RIGHT(pos);
-	int maximus = pos;
-
+void heap_pop_fix(heap_t *heap, int pos) {
 	void *temp;
-  
+	int l = GO_LEFT(pos), r = GO_RIGHT(pos), maximus = pos;
 
 	if (l < heap->size && heap->cmp(heap->arr[l], heap->arr[pos]) < 0)
-	maximus = l;
-	if (r < heap->size && heap->cmp(heap->arr[r], heap->arr[maximus]) < 0)
-	maximus = r;
-	if (maximus != pos) {
-	temp = heap->arr[pos];
-	heap->arr[pos] = heap->arr[maximus];
-	heap->arr[maximus] = temp;
+		maximus = l;
 
-	__heap_pop_fix(heap, maximus);
+	if (r < heap->size && heap->cmp(heap->arr[r], heap->arr[maximus]) < 0)
+		maximus = r;
+
+	if (maximus != pos) {
+		temp = heap->arr[pos];
+		heap->arr[pos] = heap->arr[maximus];
+		heap->arr[maximus] = temp;
+
+		heap_pop_fix(heap, maximus);
   }
 }
 
@@ -93,28 +102,33 @@ void heap_pop(heap_t *heap)
 
 	heap->arr[0] = heap->arr[heap->size - 1];
 
-	heap->size--;
-
-	__heap_pop_fix(heap, 0);
+	--heap->size;
+	heap_pop_fix(heap, 0);
 }
 
 int heap_empty(heap_t *heap)
 {
-	return heap->size <= 0;
+	return heap ? (heap->size == 0) : -1;
 }
 
 int heap_size(heap_t *heap)
 {
-	return heap->size;
+	return heap ? heap->size : -1;
 }
 
 void heap_free(heap_t *heap)
-{
-	for(int i = 0; i < heap->size; i++) {
-		heap->inner_free(heap->arr[i]);
-		free(heap->arr[i]);
+{	
+	if (!heap || !(heap->arr)) {
+		fprintf(stderr, "heap or heap->arr is NULL!");
+		return;
 	}
-
+		
+	if (!heap_empty(heap))
+		for(int i = 0; i != heap->size; ++i) {
+			heap->inner_free(heap->arr[i]);
+			free(heap->arr[i]);
+		}
+	
 	free(heap->arr);
 	free(heap);
 }

@@ -8,3 +8,7 @@ util/backup
 util/valgrind-out.txt
 util/valgrind-out.txt
 util/task2.c
+checker-lin/libscheduler.so
+checker-lin/_log
+util/valgrind-out.txt
+util/valgrind-out.txt

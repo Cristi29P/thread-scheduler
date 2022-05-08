@@ -5,3 +5,4 @@
 .vscode/dryrun.log
 .vscode/configurationCache.log
 util/backup
+util/valgrind-out.txt

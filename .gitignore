@@ -6,3 +6,4 @@
 .vscode/configurationCache.log
 util/backup
 util/valgrind-out.txt
+util/valgrind-out.txt

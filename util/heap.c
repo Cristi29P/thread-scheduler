@@ -1,110 +1,115 @@
 /**
- * Credits:
  * SD, 2020
  * 
  * Lab #9, BST & Heap
  * 
  * Task #2 - Heap implementation
- * The following implementation is changed but based on the lab.
  */
 
 #include "heap.h"
+#include "utils.h"
 
-void swap(void  *v1, void  *v2) {
-    void *temp;
-	temp = v1;
-	v1 = v2;
-	v2 = temp;
-}
-
-heap_t *heap_create(int (*cmp_f) (const void *, const void *), void (*free_func) (const void *))
+heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (const void *), size_t capacity)
 {
 	heap_t *heap;
 
 	heap = calloc(1, sizeof(heap_t));
-	DIE(!heap, "heap calloc");
+	DIE(heap == NULL, "heap malloc");
 
-	heap->cmp = cmp_f;
-	heap->free_func = free_func;
-	heap->size = 0;
-	heap->capacity = 2;
-	
-	heap->arr = calloc(heap->capacity, sizeof(void *));
-	DIE(!heap->arr, "heap->arr calloc");
+	heap->cmp       = cmp_f;
+	heap->inner_free = inner_free;
+	heap->size      = 0;
+	heap->capacity  = (int)capacity;
+	heap->arr       = calloc(heap->capacity, sizeof(void *));
+	DIE(heap->arr == NULL, "heap->arr malloc");
 
 	return heap;
 }
 
-void heap_insert_fix(heap_t *heap, int pos) {
+static void __heap_insert_fix(heap_t *heap, int pos) {
+	void *aux;
 	int p = GO_UP(pos);
 
 	while(pos > 0 && (heap->cmp(heap->arr[p], heap->arr[pos]) > 0)) {
-		swap(heap->arr[p], heap->arr[pos]);
+		aux = heap->arr[p];
+		heap->arr[p] = heap->arr[pos];
+		heap->arr[pos] = aux;
 
 		pos = p;
 		p = GO_UP(pos);
 	}
 }
 
-void heap_insert(heap_t *heap, void *element)
+
+void heap_insert(heap_t *heap, void *val)
 {
+	heap->arr[heap->size] = val;
 
-	heap->arr[heap->size] = element;
+	__heap_insert_fix(heap, heap->size);
 
-	heap_insert_fix(heap, heap->size);
-
-	++heap->size;
+	heap->size++;
 	if (heap->size == heap->capacity) {
 		heap->capacity *= 2;
 
 		heap->arr = realloc(heap->arr, heap->capacity * sizeof(void *));
-		DIE(!heap->arr, "heap->arr realloc");
+		DIE(heap->arr == NULL, "heap->arr realloc");
 	}
 }
 
-void *heap_top(heap_t *heap)
+void* heap_top(heap_t *heap)
 {
 	return heap->arr[0];
 }
 
-void heap_pop_fix(heap_t *heap, int pos) {
+static void __heap_pop_fix(heap_t *heap, int pos) {
 	int l = GO_LEFT(pos);
-  	int r = GO_RIGHT(pos);
-  	int max = pos;
+	int r = GO_RIGHT(pos);
+	int maximus = pos;
 
-  	if (l < (int)heap->size && heap->cmp(heap->arr[l], heap->arr[pos]) < 0)
-    	max = l;
+	void *temp;
+  
 
-  	if (r < (int)heap->size && heap->cmp(heap->arr[r], heap->arr[max]) < 0)
-    	max = r;
+	if (l < heap->size && heap->cmp(heap->arr[l], heap->arr[pos]) < 0)
+	maximus = l;
+	if (r < heap->size && heap->cmp(heap->arr[r], heap->arr[maximus]) < 0)
+	maximus = r;
+	if (maximus != pos) {
+	temp = heap->arr[pos];
+	heap->arr[pos] = heap->arr[maximus];
+	heap->arr[maximus] = temp;
 
-	if (max != pos) {
-		swap(heap->arr[pos], heap->arr[max]);
-		heap_pop_fix(heap, max);
-	}
+	__heap_pop_fix(heap, maximus);
+  }
 }
 
 void heap_pop(heap_t *heap)
 {
-	heap->free_func(heap->arr[0]);
+	if (heap_empty(heap)) {
+		return;
+	}
+	
+	heap->inner_free(heap->arr[0]);
+	free(heap->arr[0]);
 
 	heap->arr[0] = heap->arr[heap->size - 1];
+
 	heap->size--;
 
-	heap_pop_fix(heap, 0);
+	__heap_pop_fix(heap, 0);
 }
 
 int heap_empty(heap_t *heap)
 {
-	return heap->size == 0;
+	return heap->size <= 0;
 }
 
 void heap_free(heap_t *heap)
 {
-	for(int i = 0; i != (int)heap->size; ++i) {
-		heap->free_func(heap->arr[i]);
+	for(int i = 0; i < heap->size; i++) {
+		heap->inner_free(heap->arr[i]);
+		free(heap->arr[i]);
 	}
-	
+
 	free(heap->arr);
 	free(heap);
 }

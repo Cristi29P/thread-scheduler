@@ -6,10 +6,13 @@
  * Heap structure and function definitions
  */
 
-#ifndef HEAP_H
-#define HEAP_H
+#ifndef __HEAP_H_
+#define __HEAP_H_
 
-#include "utils.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
 
 #define GO_UP(x)        (((x) - 1) >> 1)
 #define GO_LEFT(x)      (((x) << 1) + 1)
@@ -20,35 +23,34 @@ struct heap_t {
     /* heap elements */
     void **arr;
 
-    /* Effective size, capacity and size of values stored */
-    size_t size, capacity;
+    int size, capacity;
 
-    /* Function used for comparing the keys */
-    int	(*cmp)(const void *key1, const void *key2);
+    /* function used for sorting the keys */
+    int	(*cmp)(const void *a, const void *b);
 
-    /* Function used for freeing a heap element */
-    void (*free_func) (const void *);
+    void (*inner_free)(const void *);
 };
 
 /**
  * Alloc memory for a new heap
- * @cmp_f: pointer to a function used for comparing
- * @free_func: pointer to a function used for freeing an element
+ * @cmp_f: pointer to a function used for sorting
  * @return: pointer to the newly created heap
  */
-heap_t *heap_create(int (*cmp_f) (const void *, const void *), void (*free_func) (const void *));
+heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (const void *), size_t capacity);
+
 /**
  * Insert a new element in a heap
  * @heap: the heap where to insert the new element
- * @element: the element to be inserted in heap
+ * @val: the val to be inserted in heap
  */
-void heap_insert(heap_t *heap, void *element);
+void heap_insert(heap_t *heap, void *val);
+
 /**
  * Get the top element
  * @heap: the heap where to search for the top element
  * @return: the top element
  */
-void *heap_top(heap_t *heap);
+void* heap_top(heap_t *heap);
 
 /**
  * Remove the top element
@@ -68,4 +70,4 @@ int heap_empty(heap_t *heap);
  */
 void heap_free(heap_t *heap);
 
-#endif /* HEAP_H */
+#endif

@@ -8,7 +8,7 @@
 
 #include "heap.h"
 
-heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (const void *), size_t capacity)
+heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (void *), size_t capacity)
 {
 	heap_t *heap;
 

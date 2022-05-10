@@ -24,7 +24,7 @@ struct heap_t {
     /* function used for sorting the keys */
     int	(*cmp)(const void *a, const void *b);
     /* function used for freeing up internal structure stored in heap */
-    void (*inner_free)(const void *);
+    void (*inner_free)(void *);
 };
 
 /**
@@ -33,7 +33,7 @@ struct heap_t {
  * @capacity: initial heap capacity
  * @return: pointer to the newly created heap
  */
-heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (const void *), size_t capacity);
+heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (void *), size_t capacity);
 
 /**
  * Insert a new element in a heap

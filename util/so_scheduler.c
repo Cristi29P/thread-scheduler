@@ -21,13 +21,12 @@ typedef struct {
     so_handler *handler; /* Function handler */
     thread_state_t state; /* Current thread state */
     unsigned int time_quantum; /* Time left on the processor while running */
-    unsigned int priority; /* Thread priority */
+    int priority; /* Thread priority */
 
 
     /* Elemente de sincronizare */
 
 } thread_t;
-
 
 typedef struct {
     unsigned int time_quantum; /* Max allowed time quantum */
@@ -36,9 +35,23 @@ typedef struct {
 
     thread_t *current_thread; /* Pointer to the currently running thread */
     
+    
 
 } scheduler_t;
 
+
+int cmp_funct(const void *a, const void *b)
+{
+    const thread_t *t1 = (thread_t *)a;
+    const thread_t *t2 = (thread_t *)b;
+
+    return t2->priority - t1->priority;
+}
+
+void free_funct(void *a)
+{
+    // WIP
+}
 
 static scheduler_t *scheduler;
 

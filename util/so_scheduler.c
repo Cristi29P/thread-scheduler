@@ -12,7 +12,6 @@
 
 /* Enum representing the possible states a thread can be */
 typedef enum {
-        NEW,
         READY,
         RUNNING,
         WAITING,
@@ -61,10 +60,10 @@ void free_func(void *a)
     thread_t *thread = (thread_t *)a;
 
     rv = pthread_mutex_destroy(&(thread->running));
-    DIE(rv != 0, "mutex destroy failed!");
+    DIE(rv, "mutex destroy failed!");
 
     rv = pthread_mutex_destroy(&(thread->planned));
-    DIE(rv != 0, "mutex destroy failed!");
+    DIE(rv, "mutex destroy failed!");
 }
 
 static scheduler_t *scheduler;
@@ -85,7 +84,7 @@ int so_init(unsigned int time_quantum, unsigned int io)
     scheduler->current_thread = NULL;
 
     rv = pthread_mutex_init(&(scheduler->end), NULL);
-    DIE(rv != 0, "Error pthread_mutex_init!");
+    DIE(rv, "Error pthread_mutex_init!");
 
     scheduler->ready = heap_create(PRIO_QUEUE, cmp_func, free_func, INITIAL_CAPACITY);
     
@@ -94,15 +93,51 @@ int so_init(unsigned int time_quantum, unsigned int io)
     scheduler->waiting = calloc(io, sizeof(heap_t *));
     DIE(!(scheduler->waiting), "Failed to calloc array of waiting queues!");
 
-    for (int i = 0; i != io; ++i)
+    for (int i = 0; i != (int)io; ++i)
         scheduler->waiting[i] = heap_create(QUEUE, cmp_func, free_func, INITIAL_CAPACITY);
 
     return 0;
 }
 
+
+void *start_thread(void *args)
+{
+    thread_t *thread = (thread_t *)args;
+
+}
+
 tid_t so_fork(so_handler *func, unsigned int priority)
 {
-    return INVALID_TID;
+    thread_t *thread;
+    int rv;
+
+    if (!func) {
+        fprintf(stderr, "Handler function should not be NULL!");
+        return INVALID_TID;
+    }
+
+    if (priority > SO_MAX_PRIO) {
+        fprintf(stderr, "Priority exceeds the maximum allowed!");
+        return INVALID_TID;
+    }
+
+    thread = calloc(1, sizeof(thread));
+    DIE(!thread, "Thread calloc failed!");
+
+    ++(scheduler->no_threads);
+
+    thread->priority = priority;
+    // thread->state = NEW; // MIGHT REMOVE
+    thread->time_quantum = scheduler->time_quantum;
+    thread->handler = func;
+
+    rv = pthread_mutex_init(&(thread->running), NULL);
+    DIE(rv, "Pthread init thread->running failed!");
+
+    rv = pthread_mutex_init(&(thread->planned), NULL);
+    DIE(rv, "Pthread init thread->planned failed!");
+    
+   // rv = pthread_create
 }
 
 

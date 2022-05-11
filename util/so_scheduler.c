@@ -68,6 +68,13 @@ void free_func(void *a)
 
 static scheduler_t *scheduler;
 
+void scheduler_check(void);
+
+void scheduler_check(void) 
+{
+
+}
+
 int so_init(unsigned int time_quantum, unsigned int io)
 {   
     int rv;
@@ -103,7 +110,28 @@ int so_init(unsigned int time_quantum, unsigned int io)
 void *start_thread(void *args)
 {
     thread_t *thread = (thread_t *)args;
+    int rv;
 
+    scheduler_check();
+    
+    rv = pthread_mutex_unlock(&(thread->planned));
+    DIE(rv, "Mutex unlock thread planned error.");
+
+    // The thread should block here and wait until has the right to execute
+    rv = pthread_mutex_lock(&(thread->running));
+    DIE(rv, "Mutex lock thread running error.");
+
+
+
+    thread->handler(thread->priority);
+
+    // Mark the thread as done
+    thread->state = TERMINATED;
+
+    // Call the scheduler and add thread to finished queue
+
+
+    return NULL;
 }
 
 tid_t so_fork(so_handler *func, unsigned int priority)
@@ -127,7 +155,6 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     ++(scheduler->no_threads);
 
     thread->priority = priority;
-    // thread->state = NEW; // MIGHT REMOVE
     thread->time_quantum = scheduler->time_quantum;
     thread->handler = func;
 
@@ -137,7 +164,15 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     rv = pthread_mutex_init(&(thread->planned), NULL);
     DIE(rv, "Pthread init thread->planned failed!");
     
-   // rv = pthread_create
+    rv = pthread_create(&(thread->tid), NULL, start_thread, thread);
+    DIE(rv, "Pthread create error!");
+
+    rv = pthread_mutex_lock(&(thread->planned));
+    DIE(rv, "Pthread lock error!");
+
+    // Might add so_exec
+
+    return thread->tid;
 }
 
 
@@ -153,7 +188,17 @@ int so_signal(unsigned int io)
 
 void so_exec(void)
 {
-    return;
+    if (!(scheduler->current_thread))
+        return;
+
+    /* Get current thread handle */
+    thread_t *current_thread = scheduler->current_thread;
+
+    /* Decrease the time remaining on the processor */
+    --(current_thread->time_quantum);
+    
+    if (t)  
+
 }
 
 void so_end(void)

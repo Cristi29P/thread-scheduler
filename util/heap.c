@@ -8,12 +8,14 @@
 
 #include "heap.h"
 
-heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (void *), size_t capacity)
+heap_t *heap_create(mode_op_t mode, int (*cmp_f) (const void *a, const void *b), void (*inner_free) (void *), size_t capacity)
 {
 	heap_t *heap;
 
 	heap = calloc(1, sizeof(heap_t));
 	DIE(!heap, "heap calloc failed!");
+
+	heap->mode = mode;
 
 	DIE(!cmp_f, "NULL pointer to cmp_f not allowed!");
 	heap->cmp        = cmp_f;
@@ -56,7 +58,8 @@ void heap_insert(heap_t *heap, void *val)
 
 	heap->arr[heap->size] = val;
 
-	heap_insert_fix(heap, heap->size);
+	if (heap->mode == PRIO_QUEUE)
+		heap_insert_fix(heap, heap->size);
 
 	++heap->size;
 	if (heap->size == heap->capacity) {
@@ -97,13 +100,18 @@ void heap_pop(heap_t *heap)
 		return;
 	}
 	
-	heap->inner_free(heap->arr[0]);
-	free(heap->arr[0]);
-
-	heap->arr[0] = heap->arr[heap->size - 1];
+	if (heap->mode == PRIO_QUEUE)
+		heap->arr[0] = heap->arr[heap->size - 1];
+	else {
+		void *temp = heap->arr[0];
+		for(int i=0; i != heap->size - 1; ++i)
+        	heap->arr[i] = heap->arr[i + 1];
+    	heap->arr[heap->size - 1] = temp;
+	}
 
 	--heap->size;
-	heap_pop_fix(heap, 0);
+	if (heap->mode == PRIO_QUEUE)
+		heap_pop_fix(heap, 0);
 }
 
 int heap_empty(heap_t *heap)

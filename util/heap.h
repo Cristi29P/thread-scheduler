@@ -15,6 +15,11 @@
 #define GO_LEFT(x)      (((x) << 1) + 1)
 #define GO_RIGHT(x)     (((x) << 1) + 2)
 
+typedef enum {
+    QUEUE,
+    PRIO_QUEUE
+} mode_op_t;
+
 typedef struct heap_t heap_t;
 struct heap_t {
     /* heap elements */
@@ -25,6 +30,8 @@ struct heap_t {
     int	(*cmp)(const void *a, const void *b);
     /* function used for freeing up internal structure stored in heap */
     void (*inner_free)(void *);
+    /* queue mode */
+    mode_op_t mode;
 };
 
 /**
@@ -33,7 +40,7 @@ struct heap_t {
  * @capacity: initial heap capacity
  * @return: pointer to the newly created heap
  */
-heap_t *heap_create(int (*cmp_f) (const void *a, const void *b), void (*inner_free) (void *), size_t capacity);
+heap_t *heap_create(mode_op_t mode, int (*cmp_f) (const void *a, const void *b), void (*inner_free) (void *), size_t capacity);
 
 /**
  * Insert a new element in a heap

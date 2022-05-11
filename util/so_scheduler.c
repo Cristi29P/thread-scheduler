@@ -1,5 +1,8 @@
 #include <pthread.h>
 #include <semaphore.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/types.h>
 
 #include "so_scheduler.h"
 #include "heap.h"
@@ -23,8 +26,9 @@ typedef struct {
     unsigned int time_quantum; /* Time left on the processor while running */
     int priority; /* Thread priority */
 
-
-    /* Elemente de sincronizare */
+    /* Sync */
+    pthread_mutex_t running;
+    pthread_mutex_t planned;
 
 } thread_t;
 
@@ -34,13 +38,16 @@ typedef struct {
     unsigned int no_threads; /* Number of threads handled by the scheduler */
 
     thread_t *current_thread; /* Pointer to the currently running thread */
+    heap_t *ready; /* Threads which are waiting to be planned */
+    heap_t *finished; /* Threads which finished their job and are waiting to be free'd */
+    heap_t **waiting; /* Blocked threads by an event */
     
-    
-
+    /* Sync */
+    pthread_mutex_t end;
 } scheduler_t;
 
 
-int cmp_funct(const void *a, const void *b)
+int cmp_func(const void *a, const void *b)
 {
     const thread_t *t1 = (thread_t *)a;
     const thread_t *t2 = (thread_t *)b;
@@ -48,15 +55,24 @@ int cmp_funct(const void *a, const void *b)
     return t2->priority - t1->priority;
 }
 
-void free_funct(void *a)
+void free_func(void *a)
 {
-    // WIP
+    int rv;
+    thread_t *thread = (thread_t *)a;
+
+    rv = pthread_mutex_destroy(&(thread->running));
+    DIE(rv != 0, "mutex destroy failed!");
+
+    rv = pthread_mutex_destroy(&(thread->planned));
+    DIE(rv != 0, "mutex destroy failed!");
 }
 
 static scheduler_t *scheduler;
 
 int so_init(unsigned int time_quantum, unsigned int io)
-{
+{   
+    int rv;
+
     if (scheduler || (io > SO_MAX_NUM_EVENTS) || !time_quantum)
         return SO_FAIL;
 
@@ -68,6 +84,18 @@ int so_init(unsigned int time_quantum, unsigned int io)
     scheduler->no_threads = 0;
     scheduler->current_thread = NULL;
 
+    rv = pthread_mutex_init(&(scheduler->end), NULL);
+    DIE(rv != 0, "Error pthread_mutex_init!");
+
+    scheduler->ready = heap_create(PRIO_QUEUE, cmp_func, free_func, INITIAL_CAPACITY);
+    
+    scheduler->finished = heap_create(QUEUE, cmp_func, free_func, INITIAL_CAPACITY);
+
+    scheduler->waiting = calloc(io, sizeof(heap_t *));
+    DIE(!(scheduler->waiting), "Failed to calloc array of waiting queues!");
+
+    for (int i = 0; i != io; ++i)
+        scheduler->waiting[i] = heap_create(QUEUE, cmp_func, free_func, INITIAL_CAPACITY);
 
     return 0;
 }
@@ -98,5 +126,6 @@ void so_end(void)
     if (scheduler) {
         free(scheduler);
     }
+
     scheduler = NULL;
 }

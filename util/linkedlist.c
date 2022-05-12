@@ -3,6 +3,7 @@
 void list_init(LinkedList *list, void (*free_func)(void *))
 {
 	list->head = NULL;
+	list->back = NULL;
 	list->size = 0;
 	list->free_func = free_func;
 }
@@ -11,10 +12,19 @@ void add_node(LinkedList *list, int n, void *new_data)
 {
 	Node *prev, *curr, *new_node;
 
-	if (!list || n < 0)
+	if (!list || n < 0 || !new_data)
 		return;
-	else if (n > list->size)
-		n = list->size;
+	
+	new_node = calloc(1, sizeof(Node));
+	DIE(!new_node, "new_node calloc failed!");
+
+	if (n >= list->size) {
+		++(list->size);
+		list->back->next = new_node;
+		list->back = new_node;
+		new_node->next = NULL;
+		return;
+	}
 
 	prev = NULL;
 	curr = list->head;
@@ -23,9 +33,6 @@ void add_node(LinkedList *list, int n, void *new_data)
 		prev = curr;
 		curr = curr->next;
 	}
-
-	new_node = calloc(1, sizeof(Node));
-	DIE(!new_node, "new_node calloc failed!");
 
 	new_node->next = curr;
 	new_node->data = new_data;
@@ -42,14 +49,11 @@ void *remove_node(LinkedList *list, int n)
 {
 	Node *prev, *curr;
 
-	if (!list || !(list->head))
+	if (!list || !(list->head) || (n < 0))
 		return NULL;
 
 	if (n > list->size - 1)
 		n = list->size - 1;
-
-	if (n < 0)
-		return NULL;
 
 	prev = NULL;
 	curr = list->head;
@@ -72,14 +76,11 @@ void *get_node(LinkedList *list, int nth_node)
 {
 	Node *curr;
 
-	if (!list || !(list->head))
+	if (!list || !(list->head) || (nth_node < 0))
 		return NULL;
 
-	if (nth_node > list->size - 1)
-		nth_node = list->size - 1;
-
-	if (nth_node < 0)
-		return NULL;
+	if (nth_node >= list->size - 1)
+		return list->back;
 
 	curr = list->head;
 
@@ -91,7 +92,7 @@ void *get_node(LinkedList *list, int nth_node)
 
 int list_size(LinkedList *list)
 {
-	return (!list) ? -1 : list->size;
+	return list ? list->size : -1;
 }
 
 void free_list_mem(LinkedList **pp_list)

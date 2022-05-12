@@ -11,13 +11,14 @@
 
 typedef struct Node Node;
 struct Node {
-	struct Node *next;
+	Node *next;
 	void *data;
 };
 
 typedef struct LinkedList LinkedList;
 struct LinkedList {
-	struct Node *head;
+	Node *head;
+	Node *back;
 	int size;
 	void (*free_func)(void *);
 };

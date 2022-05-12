@@ -14,3 +14,6 @@ util/valgrind-out.txt
 util/valgrind-out.txt
 .vscode/settings.json
 util/test.c
+checker-lin/_test/scheduler_test.h
+checker-lin/_test/scheduler_test.h
+checker-lin/_test/test_exec.c

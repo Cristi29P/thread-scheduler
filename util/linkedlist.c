@@ -12,17 +12,26 @@ void add_node(LinkedList *list, int n, void *new_data)
 {
 	Node *prev, *curr, *new_node;
 
-	if (!list || n < 0 || !new_data)
+	if (!list || (n < 0) || !new_data)
 		return;
 	
 	new_node = calloc(1, sizeof(Node));
 	DIE(!new_node, "new_node calloc failed!");
 
+	/* If first node to be added */
+	if (list->size == 0) {
+		++(list->size);
+		list->head = list->back = new_node;
+		new_node->data = new_data;
+		return;
+	}
+	
+	/* Add last position */
 	if (n >= list->size) {
 		++(list->size);
 		list->back->next = new_node;
 		list->back = new_node;
-		new_node->next = NULL;
+		new_node->data = new_data;
 		return;
 	}
 
@@ -39,9 +48,9 @@ void add_node(LinkedList *list, int n, void *new_data)
 
 	++(list->size);
 
-	if (!prev)
+	if (!prev) /* Add first position */
 		list->head = new_node;
-	else
+	else /* Generic add */
 		prev->next = new_node;
 }
 
@@ -49,8 +58,16 @@ void *remove_node(LinkedList *list, int n)
 {
 	Node *prev, *curr;
 
-	if (!list || !(list->head) || (n < 0))
+	if (!list || !(list->head) || (!list->back) || (n < 0))
 		return NULL;
+
+	/* Only one node to be removed */
+	if (list->size == 1) {
+		--(list->size);
+		curr = list->head;
+		list->head = list->back = NULL;
+		return curr;
+	}
 
 	if (n > list->size - 1)
 		n = list->size - 1;
@@ -66,8 +83,13 @@ void *remove_node(LinkedList *list, int n)
 	--(list->size);
 	if (!prev)
 		list->head = curr->next;
-	else
-		prev->next = curr->next;
+	else {
+		if (curr == list->back) {
+			list->back = prev;
+			prev->next = NULL;
+		} else
+			prev->next = curr->next;
+	}
 
 	return curr;
 }

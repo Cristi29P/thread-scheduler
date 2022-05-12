@@ -9,7 +9,7 @@ struct prio_queue_t
     /* List used for storing elements */
     LinkedList *list; 
     /* Queue size */
-    unsigned int size; 
+    int size; 
     /* Function used for freeing a custom element */
 	void (*free_func)(void *);
     /* Compare function for priority */
@@ -18,8 +18,14 @@ struct prio_queue_t
 
 prio_queue_t *queue_init(int (*cmp)(const void *a, const void *b), void (*free_func)(void *));
 
+void queue_push(prio_queue_t *queue, void *val);
 
+void *queue_pop(prio_queue_t *queue);
 
+void *queue_top(prio_queue_t *queue);
 
+void queue_free(prio_queue_t *queue);
+
+int queue_size(prio_queue_t *queue);
 
 #endif /* PRIO_QUEUE_H_ */

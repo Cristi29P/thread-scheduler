@@ -91,7 +91,7 @@ void *get_node(LinkedList *list, int nth_node)
 
 int list_size(LinkedList *list)
 {
-	return (!list) ? -1 : (int)(list->size);
+	return (!list) ? -1 : list->size;
 }
 
 void free_list_mem(LinkedList **pp_list)

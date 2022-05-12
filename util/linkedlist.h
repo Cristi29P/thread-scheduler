@@ -18,7 +18,7 @@ struct Node {
 typedef struct LinkedList LinkedList;
 struct LinkedList {
 	struct Node *head;
-	unsigned int size;
+	int size;
 	void (*free_func)(void *);
 };
 

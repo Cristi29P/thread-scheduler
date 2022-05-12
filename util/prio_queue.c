@@ -14,6 +14,8 @@ prio_queue_t *queue_init(int (*cmp)(const void *a, const void *b), void (*free_f
 	queue->size       = 0;
     
     queue->list = calloc(1, sizeof(LinkedList));
+    DIE(!(queue->list), "queue->list calloc failed!");
+
     list_init(queue->list, free_func);
 
     return queue;
@@ -36,7 +38,6 @@ void queue_push(prio_queue_t *queue, void *val)
     
     /* Get correct position in queue */
     while (first && (queue->cmp(val, first->data) <= 0)) {
-        // puts("Here");
         ++cnt;
         first = get_node(queue->list, cnt);
         if (cnt == queue->list->size)

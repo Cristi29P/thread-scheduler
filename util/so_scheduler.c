@@ -6,6 +6,7 @@
 
 #include "so_scheduler.h"
 #include "prio_queue.h"
+#include <unistd.h>
 
 #define SO_FAIL -1
 
@@ -19,7 +20,8 @@ typedef enum {
 
 typedef enum {
     PLANNING,
-    FINISHED
+    FINISHED,
+    GENERAL
 } sched_modes_t;
 
 typedef struct {
@@ -30,8 +32,8 @@ typedef struct {
     int priority; /* Thread priority */
 
     /* Sync */
-    pthread_mutex_t running;
-    pthread_mutex_t planned;
+    sem_t running;
+    sem_t planned;
 
 } thread_t;
 
@@ -46,7 +48,7 @@ typedef struct {
     prio_queue_t **waiting; /* Blocked threads by an event */
     
     /* Sync */
-    pthread_mutex_t end; /* Used for signaling when the scheduler should stop */
+    sem_t end; /* Used for signaling when the scheduler should stop */
 } scheduler_t;
 
 
@@ -63,11 +65,15 @@ void free_func(void *a)
     int rv;
     thread_t *thread = (thread_t *)a;
 
-    rv = pthread_mutex_destroy(&(thread->running));
-    DIE(rv, "mutex destroy failed!");
+    pthread_join(thread->tid, NULL);
 
-    rv = pthread_mutex_destroy(&(thread->planned));
-    DIE(rv, "mutex destroy failed!");
+    rv = sem_destroy(&(thread->running));
+    DIE(rv, "sem destroy failed!");
+
+    rv = sem_destroy(&(thread->planned));
+    DIE(rv, "sem destroy failed!");
+
+    free(thread);
 }
 
 static scheduler_t *scheduler;
@@ -76,23 +82,33 @@ void plan_thread(thread_t *thread);
 
 void terminate_thread(thread_t *thread);
 
+void schedule_thread(thread_t *thread);
+
 void scheduler_check(sched_modes_t sched_mode, thread_t *thread);
 
 void scheduler_check(sched_modes_t sched_mode, thread_t *thread) 
 {
-    switch (sched_mode) {
-        case PLANNING: plan_thread(thread); break;
-        case FINISHED: terminate_thread(thread); break;
+    if (sched_mode == PLANNING) {
+        plan_thread(thread);
+    }
+
+    if (sched_mode == FINISHED) {
+        terminate_thread(thread);
+    }
+
+    if (sched_mode == GENERAL) {
+        schedule_thread(thread); 
     }
 }
 
 void plan_thread(thread_t *thread)
 {
     /* First thread to enter/ no other thread is running */
-    if (!scheduler->current_thread) {
+    if (!(scheduler->current_thread)) {
+
         thread->state = RUNNING;
         scheduler->current_thread = thread;
-        pthread_mutex_unlock(&(thread->running));
+        sem_post(&(thread->running));
         return;
     }
 
@@ -114,14 +130,52 @@ void plan_thread(thread_t *thread)
 void terminate_thread(thread_t *thread)
 {   
     // One more cond
-    queue_push(scheduler->finished, thread);
-    scheduler->current_thread = queue_pop(scheduler->ready);
+    if (thread->state == TERMINATED) {
+        queue_push(scheduler->finished, thread);
+        scheduler->current_thread = queue_pop(scheduler->ready);
 
-    if (scheduler->current_thread)
-        pthread_mutex_unlock(&(scheduler->current_thread->running));
-    
-    if (!(scheduler->current_thread) && !queue_size(scheduler->ready))
-        pthread_mutex_unlock(&(scheduler->end));
+        if (scheduler->current_thread)
+            sem_post(&(scheduler->current_thread->running));
+        
+        if (!(scheduler->current_thread) && !queue_size(scheduler->ready))
+            sem_post(&(scheduler->end));
+    }
+}
+
+void schedule_thread(thread_t *thread)
+{
+    thread_t *aux;
+    if (!thread->time_quantum) {
+        thread->state = READY;
+        thread->time_quantum = scheduler->time_quantum;
+
+        queue_push(scheduler->ready, thread);
+
+        aux = queue_pop(scheduler->ready);
+
+        // MAYBBE REMOVE OR CHANGE TO FOR
+        while (aux && aux->state == TERMINATED) {
+            queue_push(scheduler->finished, aux);
+            aux = queue_pop(scheduler->ready);
+        }
+
+        scheduler->current_thread = aux;
+        if (aux) {
+            scheduler->current_thread->state = RUNNING;
+            sem_post(&(scheduler->current_thread->running));
+        }
+    } else if (queue_size(scheduler->ready) &&
+        thread->priority < ((thread_t *)queue_top(scheduler->ready))->priority) {
+        thread->state = READY;
+        queue_push(scheduler->ready, thread);
+        scheduler->current_thread = queue_pop(scheduler->ready);
+        scheduler->current_thread->state = RUNNING;
+        sem_post(&(scheduler->current_thread->running));
+    }
+
+    if (thread != scheduler->current_thread)
+        sem_wait(&(thread->running));
+
 }
 
 int so_init(unsigned int time_quantum, unsigned int io)
@@ -139,7 +193,7 @@ int so_init(unsigned int time_quantum, unsigned int io)
     scheduler->no_threads = 0;
     scheduler->current_thread = NULL;
 
-    rv = pthread_mutex_init(&(scheduler->end), NULL);
+    rv = sem_init(&(scheduler->end), 0, 0);
     DIE(rv, "Error pthread_mutex_init!");
 
     scheduler->ready = queue_init(cmp_func, free_func);
@@ -161,14 +215,18 @@ void *start_thread(void *args)
     thread_t *thread = (thread_t *)args;
     int rv;
 
+
+
     scheduler_check(PLANNING, thread);
+
+
     
     /* Thread planned */
-    rv = pthread_mutex_unlock(&(thread->planned));
+    rv = sem_post(&(thread->planned));
     DIE(rv, "Mutex unlock thread planned error.");
 
     // The thread should block here and wait until has the right to execute
-    rv = pthread_mutex_lock(&(thread->running));
+    rv = sem_wait(&(thread->running));
     DIE(rv, "Mutex lock thread running error.");
 
     thread->handler(thread->priority);
@@ -197,7 +255,7 @@ tid_t so_fork(so_handler *func, unsigned int priority)
         return INVALID_TID;
     }
 
-    thread = calloc(1, sizeof(thread));
+    thread = calloc(1, sizeof(thread_t));
     DIE(!thread, "Thread calloc failed!");
 
     ++(scheduler->no_threads);
@@ -206,18 +264,22 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     thread->time_quantum = scheduler->time_quantum;
     thread->handler = func;
 
-    rv = pthread_mutex_init(&(thread->running), NULL);
+    rv = sem_init(&(thread->running), 0, 0);
     DIE(rv, "Pthread init thread->running failed!");
 
-    rv = pthread_mutex_init(&(thread->planned), NULL);
+    rv = sem_init(&(thread->planned), 0, 0);
     DIE(rv, "Pthread init thread->planned failed!");
     
+
     rv = pthread_create(&(thread->tid), NULL, start_thread, thread);
     DIE(rv, "Pthread create error!");
 
+
     /* Wait for thread to be planned */
-    rv = pthread_mutex_lock(&(thread->planned));
+    rv = sem_wait(&(thread->planned));
     DIE(rv, "Pthread lock error!");
+
+
 
     /* If we are the first thread */
     if (scheduler->current_thread != thread)
@@ -247,15 +309,29 @@ void so_exec(void)
 
     /* Decrease the time remaining on the processor */
     --(current_thread->time_quantum);
+
     
-    scheduler_check(); 
-    
-    return;
+    scheduler_check(GENERAL, current_thread); 
 }
 
 void so_end(void)
 {
     if (scheduler) {
+        if (scheduler->no_threads) 
+            sem_wait(&(scheduler->end));
+
+        queue_free(scheduler->ready);
+        queue_free(scheduler->finished);
+
+        if (scheduler->current_thread)
+            free_func(&(scheduler->current_thread));
+        
+        for (int i = 0; i != (int)scheduler->io; ++i)
+            queue_free(scheduler->waiting[i]);
+
+
+        sem_destroy(&(scheduler->end));
+        free(scheduler->waiting);
         free(scheduler);
     }
 
@@ -265,3 +341,4 @@ void so_end(void)
 
 // TODO: JOIN THREADS WHEN FINISHED
 // TODO: CLEAN UP MEMORY SO_END
+// ADD DIE TO PTHREAD CALLS

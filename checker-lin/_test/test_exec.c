@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define SO_VERBOSE_ERROR 1
+
 /*
  * 12) Test exec no preemption
  *

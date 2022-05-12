@@ -16,6 +16,8 @@
 #define SO_TEST_FAIL	0
 #define SO_TEST_SUCCESS	1
 #define SO_MAX_UNITS	32
+#define SO_VERBOSE_ERROR 1
+
 
 /* functions tested */
 extern void test_sched_01(void);

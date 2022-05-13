@@ -140,7 +140,7 @@ static void scheduler_check()
         return;
     }
     // POATE COMBIN ULTIMELE DOUA IF-URI
-    if (current->time_quantum <= 0) {
+    if (current->time_quantum == 0) {
 
         if (current->priority == next->priority) {
             queue_pop(scheduler->ready);
@@ -157,7 +157,7 @@ static void scheduler_check()
         }
 
         current->time_quantum = scheduler->time_quantum;
-    } // == 0
+    } 
 
     rv = sem_post(&(current->running));
     DIE(rv, "Sem post failed!");

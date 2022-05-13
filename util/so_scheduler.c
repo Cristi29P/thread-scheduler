@@ -57,7 +57,12 @@ void free_func(void *a)
     int rv;
     thread_t *thread = (thread_t *)a;
 
+                fprintf(stderr, "SALOOT3!\n");
+
+
     pthread_join(thread->tid, NULL);
+
+
 
     rv = sem_destroy(&(thread->running));
     DIE(rv, "sem destroy failed!");
@@ -165,9 +170,6 @@ static void scheduler_check()
         return;
     }
     
-   
-
-
     if (current->priority < next->priority) {
         mark_as_ready(current);
         
@@ -348,18 +350,20 @@ void so_end(void)
 {
     fprintf(stderr, "SO_END! from main thread\n");
     if (scheduler) {
-        // if (scheduler->no_threads) 
-        sem_wait(&(scheduler->end));
+        if (scheduler->no_threads) 
+            sem_wait(&(scheduler->end));
         
         fprintf(stderr, "SHOULD NOT GO HERE from main thread\n");
 
         queue_free(scheduler->ready);
         queue_free(scheduler->finished);
 
+        fprintf(stderr, "SALOOT2!\n");
+
         
 
-        if (scheduler->current_thread)
-            free_func(&(scheduler->current_thread));
+        // if (scheduler->current_thread)
+        //     free_func(&(scheduler->current_thread));
 
         fprintf(stderr, "HELLO!\n");
         

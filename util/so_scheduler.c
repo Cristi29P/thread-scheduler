@@ -188,7 +188,7 @@ int so_init(unsigned int time_quantum, unsigned int io)
     scheduler->no_threads = 0;
     scheduler->current_thread = NULL;
 
-    rv = sem_init(&(scheduler->end), 0, 1);
+    rv = sem_init(&(scheduler->end), 0, 0);
     DIE(rv, "Error pthread_mutex_init!");
 
     scheduler->ready = queue_init(cmp_func, free_func);
@@ -210,7 +210,6 @@ void *start_thread(void *args)
 
     thread_t *thread = (thread_t *)args;
     int rv;
-
 
     // The thread should block here and wait until has the right to execute
     rv = sem_wait(&(thread->running));
@@ -245,9 +244,6 @@ tid_t so_fork(so_handler *func, unsigned int priority)
 
     thread = calloc(1, sizeof(thread_t));
     DIE(!thread, "Thread calloc failed!");
-
-    if (scheduler->no_threads == 0)
-        sem_wait(&(scheduler->end));
 
     thread->priority = priority;
     thread->time_quantum = scheduler->time_quantum;
@@ -307,24 +303,18 @@ void so_end(void)
         if (scheduler->no_threads) 
             sem_wait(&(scheduler->end));
         
-
         queue_free(scheduler->ready);
         queue_free(scheduler->finished);
 
-
         if (scheduler->current_thread)
             free_func(scheduler->current_thread);
-
         
         for (int i = 0; i != (int)scheduler->io; ++i)
             queue_free(scheduler->waiting[i]);
 
-
         sem_destroy(&(scheduler->end));
         free(scheduler->waiting);
         free(scheduler);
-
-        
     }
 
     scheduler = NULL;

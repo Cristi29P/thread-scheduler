@@ -57,12 +57,7 @@ void free_func(void *a)
     int rv;
     thread_t *thread = (thread_t *)a;
 
-                fprintf(stderr, "SALOOT3!\n");
-
-
     pthread_join(thread->tid, NULL);
-
-
 
     rv = sem_destroy(&(thread->running));
     DIE(rv, "sem destroy failed!");
@@ -74,30 +69,7 @@ static scheduler_t *scheduler;
 
 void mark_as_ready(thread_t *thread);
 
-static void check_ending(thread_t *thread);
-
 static void scheduler_check();
-
-static void check_ending(thread_t *thread)
-{
-    int rv;
-
-    fprintf(stderr, "SIZE IN CHECK_ENDING: %d\n", queue_size(scheduler->ready));
-
-    if (queue_size(scheduler->ready) == 0) {
-        fprintf(stderr, "QUEUE SIZE 0 in CHECK ENDING\n");
-        
-        if (thread->state == TERMINATED) {
-            fprintf(stderr, "UNLOCKS END\n");
-    
-            rv = sem_post(&(scheduler->end));
-            DIE(rv, "Sem post end failed");
-        }
-
-        rv = sem_post(&(thread->running));
-        DIE(rv, "Sem post thread running failed in check_ending!");
-    }
-}
 
 static void scheduler_check() 
 {
@@ -107,33 +79,21 @@ static void scheduler_check()
     current = scheduler->current_thread;
 
     if (queue_size(scheduler->ready) == 0) {
-        fprintf(stderr, "QUEUE SIZE 0 in CHECK ENDING\n");
         
-        if (current->state == TERMINATED) {
-            fprintf(stderr, "UNLOCKS END\n");
-    
+        if (current->state == TERMINATED) {    
             rv = sem_post(&(scheduler->end));
             DIE(rv, "Sem post end failed");
         }
 
         rv = sem_post(&(current->running));
         DIE(rv, "Sem post thread running failed in check_ending!");
-        fprintf(stderr, "SALOOT!\n");
         return;
     }
 
-    if (queue_size(scheduler->ready) == 0)
-        fprintf(stderr, "scher_rdy size is 0\n");
-
-     if (queue_size(scheduler->ready) == 1)
-        fprintf(stderr, "scher_rdy size is 1\n");
-
-    next = queue_pop(scheduler->ready);
-    fprintf(stderr, "new_size after top %d\n", queue_size(scheduler->ready));
-
-    
+    next = queue_top(scheduler->ready);
 
     if (!current) {
+        queue_pop(scheduler->ready);
         next->state = RUNNING;
         next->time_quantum = scheduler->time_quantum;
         scheduler->current_thread = next;
@@ -143,26 +103,21 @@ static void scheduler_check()
         return;
     }
 
-    fprintf(stderr, "BEFORE eqal!\n"); 
     next->state = RUNNING;
-    fprintf(stderr, "AFTER eqal!\n"); 
 
     if (current->state == TERMINATED) { // IF PT IO DE ADAUGAT
-       
+        queue_pop(scheduler->ready);
+
 
         queue_push(scheduler->finished, current);
-        fprintf(stderr, "AFTER PUSH!\n");        
 
         next->state = RUNNING;
 
-        fprintf(stderr, "AFTER state!\n"); 
 
         next->time_quantum = scheduler->time_quantum;
 
-        fprintf(stderr, "AFTER quant!\n"); 
         scheduler->current_thread = next;
 
-        fprintf(stderr, "AFTER equal!\n"); 
         rv = sem_post(&(next->running));
 
 
@@ -171,6 +126,8 @@ static void scheduler_check()
     }
     
     if (current->priority < next->priority) {
+        queue_pop(scheduler->ready);
+
         mark_as_ready(current);
         
         next->state = RUNNING;
@@ -186,6 +143,8 @@ static void scheduler_check()
     if (current->time_quantum <= 0) {
 
         if (current->priority == next->priority) {
+            queue_pop(scheduler->ready);
+
             mark_as_ready(current);
         
             next->state = RUNNING;
@@ -200,9 +159,7 @@ static void scheduler_check()
         current->time_quantum = scheduler->time_quantum;
     } // == 0
 
-    
     rv = sem_post(&(current->running));
-    fprintf(stderr, "HERE LAST\n");
     DIE(rv, "Sem post failed!");
 }
 
@@ -210,11 +167,9 @@ static void scheduler_check()
 
 void mark_as_ready(thread_t *thread)
 {
-    fprintf(stderr, "HERE! mark as ready!\n");
     thread->state = READY;
     queue_push(scheduler->ready, thread);
 
-    fprintf(stderr, "SIZE IN MARK_AS_READY: %d\n", queue_size(scheduler->ready));
 }
 
 
@@ -252,8 +207,10 @@ int so_init(unsigned int time_quantum, unsigned int io)
 
 void *start_thread(void *args)
 {
+
     thread_t *thread = (thread_t *)args;
     int rv;
+
 
     // The thread should block here and wait until has the right to execute
     rv = sem_wait(&(thread->running));
@@ -261,11 +218,11 @@ void *start_thread(void *args)
 
     thread->handler(thread->priority);
 
+
     // Mark the thread as done
     thread->state = TERMINATED;
 
     // Call the scheduler and add thread to finished queue
-    fprintf(stderr, "ENTER FINAL TERMINATED\n");
     scheduler_check();
 
     return NULL;
@@ -299,7 +256,7 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     rv = sem_init(&(thread->running), 0, 0);
     DIE(rv, "Pthread init thread->running failed!");
     
-    rv = pthread_create(&(thread->tid), NULL, start_thread, thread);
+    rv = pthread_create(&(thread->tid), NULL, &start_thread, thread);
     DIE(rv, "Pthread create error!");
     
     ++(scheduler->no_threads);
@@ -308,11 +265,9 @@ tid_t so_fork(so_handler *func, unsigned int priority)
 
     /* If we are the first thread */
     if (scheduler->current_thread != NULL) {
-        fprintf(stderr, "FIRSTTTTTTTT\n");
         so_exec();
     }
     else {
-        fprintf(stderr, "SECONDDDDD\n");
         scheduler_check();
     }
     return thread->tid;
@@ -348,24 +303,18 @@ void so_exec(void)
 
 void so_end(void)
 {
-    fprintf(stderr, "SO_END! from main thread\n");
     if (scheduler) {
         if (scheduler->no_threads) 
             sem_wait(&(scheduler->end));
         
-        fprintf(stderr, "SHOULD NOT GO HERE from main thread\n");
 
         queue_free(scheduler->ready);
         queue_free(scheduler->finished);
 
-        fprintf(stderr, "SALOOT2!\n");
 
-        
+        if (scheduler->current_thread)
+            free_func(scheduler->current_thread);
 
-        // if (scheduler->current_thread)
-        //     free_func(&(scheduler->current_thread));
-
-        fprintf(stderr, "HELLO!\n");
         
         for (int i = 0; i != (int)scheduler->io; ++i)
             queue_free(scheduler->waiting[i]);

@@ -21,7 +21,7 @@ struct LinkedList {
 	Node *head;
 	Node *back;
 	int size;
-	void (*free_func)(void *);
+	void (*free_func)(void *a);
 };
 
 void list_init(LinkedList *list, void (*free_func)(void *));

@@ -1,6 +1,6 @@
 /**
  * Useful structures/macros
- * 
+ *
  * https://ocw.cs.pub.ro/courses/so/laboratoare/resurse/die
  */
 

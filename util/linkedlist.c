@@ -13,7 +13,7 @@ void add_node(LinkedList *list, int nth_node, void *new_data)
 
 	if (!list || nth_node < 0 || !new_data)
 		return;
-	
+
 	DIE(!(new_node = calloc(1, sizeof(Node))), "new_node calloc failed!");
 
 	/* If first node to be added */
@@ -23,7 +23,7 @@ void add_node(LinkedList *list, int nth_node, void *new_data)
 		new_node->data = new_data;
 		return;
 	}
-	
+
 	/* Add last position */
 	if (nth_node >= list->size) {
 		++list->size;

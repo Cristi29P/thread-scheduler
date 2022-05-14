@@ -14,7 +14,7 @@ prio_queue_t *queue_init(int (*cmp)(const void *a, const void *b), void (*free_f
 	queue->size       = 0;
     
     queue->list = calloc(1, sizeof(LinkedList));
-    DIE(!(queue->list), "queue->list calloc failed!");
+    DIE(!queue->list, "queue->list calloc failed!");
 
     list_init(queue->list, free_func);
 
@@ -26,12 +26,12 @@ void queue_push(prio_queue_t *queue, void *val)
     int cnt = 0;
     Node *first = get_node(queue->list, 0);
 
-    if (!queue || !(queue->list) || !val)
+    if (!queue || !queue->list || !val)
         return;
 
     /* If first element */
     if (!queue->size) {
-        ++(queue->size);
+        ++queue->size;
         add_node(queue->list, 0, val);
         return;
     }
@@ -44,7 +44,7 @@ void queue_push(prio_queue_t *queue, void *val)
             break;
     }
 
-    ++(queue->size);
+    ++queue->size;
     
     add_node(queue->list, cnt, val);
 }
@@ -54,13 +54,13 @@ void *queue_pop(prio_queue_t *queue)
     Node *temp;
     void *val;
 
-    if (!queue || !(queue->list) || !queue->size)
+    if (!queue || !queue->list || !queue->size)
         return NULL;
     
     temp = (Node *)(remove_node(queue->list, 0));
     val = temp->data;
 
-    --(queue->size);
+    --queue->size;
 
     free(temp);
     return val;
@@ -73,10 +73,10 @@ void *queue_top(prio_queue_t *queue)
 
 void queue_free(prio_queue_t *queue)
 {
-    if (!queue || !(queue->list))
+    if (!queue || !queue->list)
         return;
 
-    free_list_mem(&(queue->list));
+    free_list_mem(&queue->list);
     free(queue);
 }
 

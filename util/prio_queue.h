@@ -1,3 +1,11 @@
+/**
+ * @Copyright Paris Cristian-Tanase 2022
+ * Sursa este scrisa exclusiv de mine de la zero si se foloseste
+ * de implementarea de lista inlantuita (modificata, de asemenea,
+ * pentru aceasta tema) din cadrul temei 1 de la S.O.
+ * Link GIT linkedlist: https://github.com/Cristi29P/c-preprocessor.git
+ */
+
 #ifndef PRIO_QUEUE_H_
 #define PRIO_QUEUE_H_
 

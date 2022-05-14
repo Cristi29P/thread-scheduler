@@ -2,33 +2,31 @@
 
 void list_init(LinkedList *list, void (*free_func)(void *))
 {
-	list->head = NULL;
-	list->back = NULL;
+	list->head = list->back = NULL;
 	list->size = 0;
 	list->free_func = free_func;
 }
 
-void add_node(LinkedList *list, int n, void *new_data)
+void add_node(LinkedList *list, int nth_node, void *new_data)
 {
 	Node *prev, *curr, *new_node;
 
-	if (!list || (n < 0) || !new_data)
+	if (!list || nth_node < 0 || !new_data)
 		return;
 	
-	new_node = calloc(1, sizeof(Node));
-	DIE(!new_node, "new_node calloc failed!");
+	DIE(!(new_node = calloc(1, sizeof(Node))), "new_node calloc failed!");
 
 	/* If first node to be added */
-	if (list->size == 0) {
-		++(list->size);
+	if (!list->size) {
+		++list->size;
 		list->head = list->back = new_node;
 		new_node->data = new_data;
 		return;
 	}
 	
 	/* Add last position */
-	if (n >= list->size) {
-		++(list->size);
+	if (nth_node >= list->size) {
+		++list->size;
 		list->back->next = new_node;
 		list->back = new_node;
 		new_node->data = new_data;
@@ -38,7 +36,7 @@ void add_node(LinkedList *list, int n, void *new_data)
 	prev = NULL;
 	curr = list->head;
 
-	for (; n > 0; --n) {
+	for (; nth_node > 0; --nth_node) {
 		prev = curr;
 		curr = curr->next;
 	}
@@ -46,7 +44,7 @@ void add_node(LinkedList *list, int n, void *new_data)
 	new_node->next = curr;
 	new_node->data = new_data;
 
-	++(list->size);
+	++list->size;
 
 	if (!prev) /* Add first position */
 		list->head = new_node;
@@ -54,33 +52,33 @@ void add_node(LinkedList *list, int n, void *new_data)
 		prev->next = new_node;
 }
 
-void *remove_node(LinkedList *list, int n)
+void *remove_node(LinkedList *list, int nth_node)
 {
 	Node *prev, *curr;
 
-	if (!list || !(list->head) || (!list->back) || (n < 0))
+	if (!list || !list->head || !list->back || nth_node < 0)
 		return NULL;
 
 	/* Only one node to be removed */
 	if (list->size == 1) {
-		--(list->size);
+		--list->size;
 		curr = list->head;
 		list->head = list->back = NULL;
 		return curr;
 	}
 
-	if (n > list->size - 1)
-		n = list->size - 1;
+	if (nth_node > list->size - 1)
+		nth_node = list->size - 1;
 
 	prev = NULL;
 	curr = list->head;
 
-	for (; n > 0; --n) {
+	for (; nth_node > 0; --nth_node) {
 		prev = curr;
 		curr = curr->next;
 	}
 
-	--(list->size);
+	--list->size;
 	if (!prev)
 		list->head = curr->next;
 	else {
@@ -98,7 +96,7 @@ void *get_node(LinkedList *list, int nth_node)
 {
 	Node *curr;
 
-	if (!list || !(list->head) || (nth_node < 0))
+	if (!list || !list->head || nth_node < 0)
 		return NULL;
 
 	if (nth_node >= list->size - 1)

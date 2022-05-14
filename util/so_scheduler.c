@@ -126,7 +126,7 @@ void mark_as_ready(thread_t *thread)
 
 int so_init(unsigned int time_quantum, unsigned int io)
 {   
-    if (scheduler || (io > SO_MAX_NUM_EVENTS) || !time_quantum)
+    if (scheduler || io > SO_MAX_NUM_EVENTS || !time_quantum)
         return SO_FAIL;
 
     DIE(!(scheduler = calloc(1, sizeof(scheduler_t))), "scheduler calloc!");
@@ -179,7 +179,7 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     DIE(sem_init(&thread->running, 0, 0), "pthread_init failed!");
     DIE(pthread_create(&thread->tid, NULL, start_thread, thread), "pthread_create failed!");
     
-    ++(scheduler->no_threads);
+    ++scheduler->no_threads;
     mark_as_ready(thread);
 
     if (scheduler->thread != NULL)
@@ -223,7 +223,7 @@ void so_exec(void)
 {
     thread_t *current = scheduler->thread;
 
-    --(current->time_quantum);
+    --current->time_quantum;
 
     /* Call the scheduler */
     scheduler_check();
@@ -241,17 +241,15 @@ void so_end(void)
     if (scheduler->no_threads)
         DIE(sem_wait(&scheduler->end), "sem_wait failed!");
 
-    queue_free(scheduler->ready);
-    queue_free(scheduler->finished);
-
     if (scheduler->thread)
         free_func(scheduler->thread);
-    
+
+    queue_free(scheduler->ready);
+    queue_free(scheduler->finished);
     for (int i = 0; i != (int)scheduler->io; ++i)
         queue_free(scheduler->waiting[i]);
 
     DIE(sem_destroy(&scheduler->end), "sem_destroy failed!");
-
     free(scheduler->waiting);
     free(scheduler);
     scheduler = NULL;

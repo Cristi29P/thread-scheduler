@@ -1,7 +1,8 @@
-/* *
+/**
  * @Copyright Paris Cristian-Tanase 2022
  * Sursa este scrisa exclusiv de mine si este prelucrata dupa scheletul
  * de cod de la SD din anul I (2020).
+ * Link GIT linkedlist: https://github.com/Cristi29P/c-preprocessor.git
  */
 
 #ifndef LINKEDLIST_H_

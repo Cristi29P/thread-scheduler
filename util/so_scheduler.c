@@ -20,8 +20,8 @@ typedef struct {
     int time_quantum; /* Time left on the processor while running */
     int priority; /* Thread priority */
 
-    /* Sync */
-    sem_t running;
+    /* Synchronization elements */
+    sem_t running; /* Used for blocking a thread when it is preempted */
 } thread_t;
 
 typedef struct {
@@ -34,150 +34,95 @@ typedef struct {
     prio_queue_t *finished; /* Threads which finished their job and are waiting to be free'd */
     prio_queue_t **waiting; /* Blocked threads by an event */
     
-    /* Sync */
+    /* Synchronization elements */
     sem_t end; /* Used for signaling when the scheduler should stop */
 } scheduler_t;
 
+scheduler_t *scheduler;
 
-int cmp_func(const void *a, const void *b)
+void mark_as_ready(thread_t *thread);
+
+void plan_next();
+
+void scheduler_check();
+
+int cmp_func(const void *t1, const void *t2)
 {
-    const thread_t *t1 = (thread_t *)a;
-    const thread_t *t2 = (thread_t *)b;
-
-    return t1->priority - t2->priority;
+    return ((thread_t *)t1)->priority - ((thread_t *)t2)->priority;
 }
 
-void free_func(void *a)
+void free_func(void *t)
 {
     int rv;
-    thread_t *thread = (thread_t *)a;
+    thread_t *thread = (thread_t *)t;
 
-    pthread_join(thread->tid, NULL);
+    rv = pthread_join(thread->tid, NULL);
+    DIE(rv, "pthread_join failed!");
 
-    rv = sem_destroy(&(thread->running));
-    DIE(rv, "sem destroy failed!");
+    rv = sem_destroy(&thread->running);
+    DIE(rv, "sem_destroy failed!");
 
     free(thread);
 }
 
-static scheduler_t *scheduler;
-
-void mark_as_ready(thread_t *thread);
-
-static void scheduler_check();
-
-static void scheduler_check() 
+void plan_next() 
 {
-    int rv;
-    thread_t *current, *next;
+    thread_t *thread = queue_pop(scheduler->ready);
 
-    current = scheduler->current_thread;
+    thread->state = RUNNING;
+    thread->time_quantum = scheduler->time_quantum;
+    scheduler->current_thread = thread;
 
-    if (queue_size(scheduler->ready) == 0) {
-        
-        if (current->state == TERMINATED) {    
-            rv = sem_post(&(scheduler->end));
-            DIE(rv, "Sem post end failed");
-        }
+    DIE(sem_post(&thread->running), "sem_post failed!");
+}
 
-        rv = sem_post(&(current->running));
-        DIE(rv, "Sem post thread running failed in check_ending!");
+void scheduler_check() 
+{
+    thread_t *current = scheduler->current_thread;
+
+    if (!queue_size(scheduler->ready)) {
+        if (current->state == TERMINATED)   
+            DIE(sem_post(&scheduler->end), "sem_post failed!");
+
+        DIE(sem_post(&current->running), "sem_post failed!");
         return;
     }
 
-    next = queue_top(scheduler->ready);
-
-    if (!current) {
-        queue_pop(scheduler->ready);
-        next->state = RUNNING;
-        next->time_quantum = scheduler->time_quantum;
-        scheduler->current_thread = next;
-        rv = sem_post(&(next->running));
-        DIE(rv, "Sem post failed!");
-
-        return;
-    }
-
-    next->state = RUNNING;
-
-    if (current->state == WAITING) {
-        queue_pop(scheduler->ready);
-
-        next->state = RUNNING;
-        next->time_quantum = scheduler->time_quantum;
-
-        scheduler->current_thread = next;
-
-        rv = sem_post(&(next->running));
-        DIE(rv, "Sem post failed!");
-
-       // rv = sem_wait(&(current->running));
+    if (!current || current->state == WAITING) {
+        plan_next();
         return;
     }
 
     if (current->state == TERMINATED) {
-        queue_pop(scheduler->ready);
-
-
         queue_push(scheduler->finished, current);
-
-        next->state = RUNNING;
-
-
-        next->time_quantum = scheduler->time_quantum;
-
-        scheduler->current_thread = next;
-
-        rv = sem_post(&(next->running));
-        DIE(rv, "Sem post failed!");
+        plan_next();
         return;
     }
     
-    if (current->priority < next->priority) {
-        queue_pop(scheduler->ready);
-
+    if (current->priority < ((thread_t *)queue_top(scheduler->ready))->priority) {
         mark_as_ready(current);
-        
-        next->state = RUNNING;
-        next->time_quantum = scheduler->time_quantum;
-        scheduler->current_thread = next;
-        rv = sem_post(&(next->running));
-        DIE(rv, "Sem post failed!");
-
-
+        plan_next();
         return;
     }
     // POATE COMBIN ULTIMELE DOUA IF-URI
     if (!current->time_quantum) {
-        if (current->priority == next->priority) {
-            queue_pop(scheduler->ready);
+        if (current->priority == ((thread_t *)queue_top(scheduler->ready))->priority) {
             mark_as_ready(current);
-        
-            next->state = RUNNING;
-            next->time_quantum = scheduler->time_quantum;
-            scheduler->current_thread = next;
-            rv = sem_post(&(next->running));
-            DIE(rv, "Sem post failed!");
-
+            plan_next();
             return;
         }
 
         current->time_quantum = scheduler->time_quantum;
     } 
 
-    rv = sem_post(&(current->running));
-    DIE(rv, "Sem post failed!");
+    DIE(sem_post(&current->running), "sem_post failed!");
 }
-
-
 
 void mark_as_ready(thread_t *thread)
 {
     thread->state = READY;
     queue_push(scheduler->ready, thread);
-
 }
-
 
 int so_init(unsigned int time_quantum, unsigned int io)
 {   
@@ -191,18 +136,14 @@ int so_init(unsigned int time_quantum, unsigned int io)
 
     scheduler->time_quantum = time_quantum;
     scheduler->io = io;
-    scheduler->no_threads = 0;
-    scheduler->current_thread = NULL;
 
-    rv = sem_init(&(scheduler->end), 0, 0);
-    DIE(rv, "Error pthread_mutex_init!");
+    rv = sem_init(&scheduler->end, 0, 0);
+    DIE(rv, "sem_init failed!");
 
     scheduler->ready = queue_init(cmp_func, free_func);
-    
     scheduler->finished = queue_init(cmp_func, free_func);
-
     scheduler->waiting = calloc(io, sizeof(prio_queue_t *));
-    DIE(!(scheduler->waiting), "Failed to calloc array of waiting queues!");
+    DIE(!scheduler->waiting, "Failed to calloc array of waiting queues!");
 
     for (int i = 0; i != (int)io; ++i)
         scheduler->waiting[i] = queue_init(cmp_func, free_func);
@@ -218,11 +159,10 @@ void *start_thread(void *args)
     int rv;
 
     // The thread should block here and wait until has the right to execute
-    rv = sem_wait(&(thread->running));
+    rv = sem_wait(&thread->running);
     DIE(rv, "Mutex lock thread running error.");
 
     thread->handler(thread->priority);
-
 
     // Mark the thread as done
     thread->state = TERMINATED;
@@ -238,13 +178,7 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     thread_t *thread;
     int rv;
 
-    if (!func) {
-        fprintf(stderr, "Handler function should not be NULL!");
-        return INVALID_TID;
-    }
-
-    if (priority > SO_MAX_PRIO) {
-        fprintf(stderr, "Priority exceeds the maximum allowed!");
+    if (!func || priority > SO_MAX_PRIO) {
         return INVALID_TID;
     }
 
@@ -255,11 +189,11 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     thread->time_quantum = scheduler->time_quantum;
     thread->handler = func;
 
-    rv = sem_init(&(thread->running), 0, 0);
-    DIE(rv, "Pthread init thread->running failed!");
+    rv = sem_init(&thread->running, 0, 0);
+    DIE(rv, "pthread_init failed!");
     
-    rv = pthread_create(&(thread->tid), NULL, &start_thread, thread);
-    DIE(rv, "Pthread create error!");
+    rv = pthread_create(&thread->tid, NULL, start_thread, thread);
+    DIE(rv, "pthread_create failed!");
     
     ++(scheduler->no_threads);
 
@@ -314,40 +248,40 @@ int so_signal(unsigned int io)
 
 void so_exec(void)
 {
-    int rv;
     thread_t *current = scheduler->current_thread;
-    
-    if (!current)
-        return;
 
     /* Decrease the time remaining on the processor */
     --(current->time_quantum);
 
     scheduler_check();
 
-    rv = sem_wait(&(current->running));
-    DIE(rv, "Sem wait failed!");
+    /* Stay here if you get preempteed */
+    DIE(sem_wait(&current->running), "sem_wait failed!");
 }
 
 void so_end(void)
 {
-    if (scheduler) {
-        if (scheduler->no_threads) 
-            sem_wait(&(scheduler->end));
-        
-        queue_free(scheduler->ready);
-        queue_free(scheduler->finished);
+    int rv;
 
-        if (scheduler->current_thread)
-            free_func(scheduler->current_thread);
-        
-        for (int i = 0; i != (int)scheduler->io; ++i)
-            queue_free(scheduler->waiting[i]);
+    if (!scheduler)
+        return;
 
-        sem_destroy(&(scheduler->end));
-        free(scheduler->waiting);
-        free(scheduler);
-    }
+    if (scheduler->no_threads)
+        DIE(sem_wait(&scheduler->end), "sem_wait failed!");
 
+    queue_free(scheduler->ready);
+    queue_free(scheduler->finished);
+
+    if (scheduler->current_thread)
+        free_func(scheduler->current_thread);
+    
+    for (int i = 0; i != (int)scheduler->io; ++i)
+        queue_free(scheduler->waiting[i]);
+
+    rv = sem_destroy(&scheduler->end);
+    DIE(rv, "sem_destroy failed!");
+
+    free(scheduler->waiting);
+    free(scheduler);
     scheduler = NULL;
 }

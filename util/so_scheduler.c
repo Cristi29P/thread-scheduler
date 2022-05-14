@@ -1,12 +1,7 @@
-#include <pthread.h>
 #include <semaphore.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <sys/types.h>
 
 #include "so_scheduler.h"
 #include "prio_queue.h"
-#include <unistd.h>
 
 #define SO_FAIL -1
 
@@ -356,8 +351,3 @@ void so_end(void)
 
     scheduler = NULL;
 }
-
-
-// TODO: JOIN THREADS WHEN FINISHED
-// TODO: CLEAN UP MEMORY SO_END
-// ADD DIE TO PTHREAD CALLS

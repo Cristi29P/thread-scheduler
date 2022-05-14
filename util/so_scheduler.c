@@ -105,7 +105,22 @@ static void scheduler_check()
 
     next->state = RUNNING;
 
-    if (current->state == TERMINATED) { // IF PT IO DE ADAUGAT
+    if (current->state == WAITING) {
+        queue_pop(scheduler->ready);
+
+        next->state = RUNNING;
+        next->time_quantum = scheduler->time_quantum;
+
+        scheduler->current_thread = next;
+
+        rv = sem_post(&(next->running));
+        DIE(rv, "Sem post failed!");
+
+       // rv = sem_wait(&(current->running));
+        return;
+    }
+
+    if (current->state == TERMINATED) {
         queue_pop(scheduler->ready);
 
 
@@ -119,8 +134,6 @@ static void scheduler_check()
         scheduler->current_thread = next;
 
         rv = sem_post(&(next->running));
-
-
         DIE(rv, "Sem post failed!");
         return;
     }
@@ -140,11 +153,9 @@ static void scheduler_check()
         return;
     }
     // POATE COMBIN ULTIMELE DOUA IF-URI
-    if (current->time_quantum == 0) {
-
+    if (!current->time_quantum) {
         if (current->priority == next->priority) {
             queue_pop(scheduler->ready);
-
             mark_as_ready(current);
         
             next->state = RUNNING;
@@ -272,12 +283,38 @@ tid_t so_fork(so_handler *func, unsigned int priority)
 
 int so_wait(unsigned int io)
 {
+    if ((int)io >= scheduler->io)
+        return SO_FAIL;
+
+    scheduler->current_thread->state = WAITING;
+    queue_push(scheduler->waiting[io], scheduler->current_thread);
+
+    so_exec();
     return 0;
+
 }
 
 int so_signal(unsigned int io)
 {
-    return 0;
+    int cnt = 0;
+    if ((int)io >= scheduler->io)
+        return SO_FAIL;
+
+    
+    thread_t *aux = queue_pop(scheduler->waiting[io]);
+
+    while (aux) {
+        aux->state = READY;
+        queue_push(scheduler->ready, aux);
+
+        ++cnt;
+
+        aux = queue_pop(scheduler->waiting[io]);
+    }
+
+    so_exec();
+
+    return cnt;
 }
 
 void so_exec(void)

@@ -80,21 +80,17 @@ void scheduler_check()
     thread_t *current = scheduler->thread;
 
     if (!queue_size(scheduler->ready)) {
-        /* If last thread finished, signal the scheduler to stop execution */
         if (current->state == TERMINATED)   
             DIE(sem_post(&scheduler->end), "sem_post failed!");
-        /* If thread did not finish execution, let it run till it ends */
         DIE(sem_post(&current->running), "sem_post failed!");
         return;
     }
 
-    /* If no currently running thread or current thread is blocked */
     if (!current || current->state == WAITING) {
         plan_next();
         return;
     }
 
-    /* */
     if (current->state == TERMINATED) {
         queue_push(scheduler->finished, current);
         plan_next();
@@ -115,10 +111,11 @@ void scheduler_check()
         }
         current->time_quantum = scheduler->time_quantum;
     } 
-
+    /* The current thread can still run */
     DIE(sem_post(&current->running), "sem_post failed!");
 }
 
+/* Add thread to ready queue */
 void mark_as_ready(thread_t *thread)
 {
     thread->state = READY;
@@ -151,11 +148,14 @@ void *start_thread(void *args)
 {
     /* The thread should block here and wait until has the right to execute */
     DIE(sem_wait(&((thread_t *)args)->running), "sem_wait failed!.");
+
     /* Thread runs its tasks via handler */
     ((thread_t *)args)->handler(((thread_t *)args)->priority);
+
     /* Thread finished its tasks. Mark the thread as done. */
     ((thread_t *)args)->state = TERMINATED;
-    /* Call the scheduler and add thread to finished queue */
+
+    /* Call the scheduler */
     scheduler_check();
 
     pthread_exit(NULL);
@@ -169,7 +169,7 @@ tid_t so_fork(so_handler *func, unsigned int priority)
         return INVALID_TID;
 
     DIE(!(thread = calloc(1, sizeof(thread_t))), "thread calloc failed!");
-
+    /* Init and start thread */
     thread->priority = priority;
     thread->time_quantum = scheduler->time_quantum;
     thread->handler = func;
@@ -180,11 +180,10 @@ tid_t so_fork(so_handler *func, unsigned int priority)
     ++(scheduler->no_threads);
     mark_as_ready(thread);
 
-    /* If we are the first thread */
     if (scheduler->thread != NULL)
-        so_exec();
+        so_exec(); /* If fork was called by another thread */
     else
-        scheduler_check();
+        scheduler_check(); /* If we are the first thread */
 
     return thread->tid;
 }
@@ -194,6 +193,7 @@ int so_wait(unsigned int io)
     if ((int)io >= scheduler->io)
         return SO_FAIL;
 
+    /* Wait for the received signal */
     scheduler->thread->state = WAITING;
     queue_push(scheduler->waiting[io], scheduler->thread);
 
@@ -235,6 +235,7 @@ void so_end(void)
     if (!scheduler)
         return;
 
+    /* Wait for all threads to finish */
     if (scheduler->no_threads)
         DIE(sem_wait(&scheduler->end), "sem_wait failed!");
 

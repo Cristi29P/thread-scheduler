@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -fPIC -g
+CFLAGS = -Wall -Wextra -Werror -fPIC
 LDFLAGS = -shared
 
 .PHONY: build

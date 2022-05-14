@@ -80,8 +80,10 @@ void scheduler_check()
     thread_t *current = scheduler->thread;
 
     if (!queue_size(scheduler->ready)) {
-        if (current->state == TERMINATED)   
+        if (current->state == TERMINATED)
+            /* Signal the scheduler to stop */
             DIE(sem_post(&scheduler->end), "sem_post failed!");
+        /* Signal the current thread it can still run */
         DIE(sem_post(&current->running), "sem_post failed!");
         return;
     }
@@ -152,7 +154,7 @@ void *start_thread(void *args)
     /* Thread runs its tasks via handler */
     ((thread_t *)args)->handler(((thread_t *)args)->priority);
 
-    /* Thread finished its tasks. Mark the thread as done. */
+    /* Thread finished its tasks. Mark the thread as terminated */
     ((thread_t *)args)->state = TERMINATED;
 
     /* Call the scheduler */

@@ -1,102 +1,90 @@
-* Name: Cristian-Tanase Paris 331CAb 
+* Name: Cristian-Tanase Paris 331CAb
 
 # Homework <NR> 4 Thread Scheduler
+
+Note: This README is common for both implementations (Linux and Windows)
 
 General structure
 -
 
-* The homework consists of 6 main parts: the handler binding function, the
-SIGSEGV handler, the look-up function (whose main purpose is to retrieve
-a pointer to the segment where the page fault occurred), the read function (that
-transfers data between the file and the mapped memory region), a function that
-converts the Linux style permission to Windows format and an init function for
-the auxiliary array used for keeping track of mapped pages.
-* I found this assignment particularly useful because it cleared up some things
-regarding the mapping process, executable structure and page faults that I 
-didn't quite understand during the lectures.
+* This homework consists of several functions whose purpose could be split up in:
+creation, synchronization and signaling.
+* I found this assignment particularly useful because it redefined the way I was
+used to think about threads and how they interact through the synchronization
+mechanisms.
 * From my point of view, I think the assignment has been implemented as efficient
-as possible, in a way that is easy to understand. 
+as possible, in a way that is easy to understand.
 
 Implementation
 -
 
 * The entire functionality has been implemented.
-* For the sake of simplicity and accessibility, the file handle was declared
-as a static variable outside any function scope and the page size on Windows
-was defined as a macro with a fixed size of 65536 bytes.
+* For the sake of simplicity and readability, an enum was declared to describe
+the multiple states a thread can find itself.
+* Each thread has a wrapper structure that contains various information used across
+the functions for synchronization and scheduling.
+* The scheduler structure contains all the data structures used for storing the
+threads and the priority queue already implements the round robin functionality
+by default.
+* The data structures used are generic and I won't go into details about their
+actual implementation. (see the comments in the code)
+* The PQ uses two auxiliary functions, a cmp_func and a free_func used for storing
+the threads according to their priority/free the memory used by them.
 
-```
-get_segment
-```
-* Receives a virtual address and returns a pointer to the segment it belongs to
-or NULL otherwise.
+#### General data flow ####
 
-```
-my_read
-```
-* Receives a buffer address used for storing the read data, the amount of bytes
-to read (size argument) and the file offset where to begin the reading.
+1. The main process calls so_init and the scheduler is created with all the
+data structures and synchronization elements needed.
+2. so_fork is called and the main thread creates a child thread, which blocks
+upon entering its thread routine.
+3. The main thread schedules the child thread (for the first so_fork) according
+to certain criteria, unblocks the child thread by incrementing the child's
+semaphore and immediately goes to so_end. Child threads can as well call so_fork
+or other functions according to the handler they received as parameter.
+4. The main thread is going to stay blocked in so_end till all the child threads
+finish their handler routines, and the last child thread increments the main
+thread's semaphore (unblocks it). Then, the main thread can proceed with cleaning
+up the memory.
+5. When a child thread creates other threads, they are immediately pushed to a
+ready queue and the thread with the highest priority is popped from the queue in
+order to run. (preemption if possible)
+6. A thread can be pulled out of the queue to run if the currently running thread
+got preempted by a higher priority one, or its time quantum expired.
+7. The so_wait function blocks a thread's semaphore and pushes it to a waiting
+queue bound to the signal received.
+8. The threads waiting for the respective signal can be popped from the waiting
+queue if another thread calls the so_signal function with that signal. Then, the
+highest priority thread is once again chosen to run and finish its work.
+9. Once a thread finish its work, it is pushed to terminated queue which is
+entirely freed at the end of the program to save time.
+10. The so_end function frees all the DS and the synchronization objects used.
 
-```
-convert_permissions
-```
-* Receives the Linux style permissions and converts them to the Windows
-standard.
+#### Difficulties ####
 
-```
-init_aux_data
-```
-* Helper function that inits a dynamically allocated vector for each segment.
-It is used for keeping track of the mapped pages.
 
-```
-so_init_loader
-```
-* We initialize the page size and associate a new handler for SIGSEGV.
+1. Debugging was a bit troublesome because it was hard to track which thread
+would end up giving a SEGFAULT or screw up the synchronization.
+2. There were some corner cases I didn't think about at first, like the fact
+that I need to block the newly created thread in its thread_func so the scheduler
+thread would have time to plan its execution.
+3. The checkstyle script should be replaced with one that actually works.
+4. Making sure the data structures used are properly implemented in a generic
+fashion and with no memory leaks or random behavior.
 
-```
-fault_handler
-```
-* We extract the virtual address that caused the fault from the info structure
-and get a pointer to the segment containing the address.
-* We check if the cause of the SIGSEGV is because the program tried to access
-a page within an unknown segment or the segment was accessed with illegal 
-permissions. In both cases, we run continue our search for a proper handler.
-* If the program tried to access a page which has not yet been mapped, we 
-calculate the page index within the segment, the offset inside the file where 
-should we start to copy data from and the effective address where we are
-supposed to map the page and then we mark the page as being mapped.
-* We map the page in memory.
-* We check for corner cases:
-    1. Only a part of the page sits outside the file range.
-	   We need to zero the rest of the page, so we calculate the remainder.
-* We copy the data from the file inside the reserved memory page.
-* We restore the segment permissions for that page. (there may be a case where
-we try to write to copy data to a page with no write permissions, so we first
-create the page with read/write and after copying the required data restore
-the permissions.)
+#### Interesting facts ####
 
-* Difficulties:
-    1. Debugging was kinda hard.
-    2. Resolving the corner cases and having the right conditions in the handler
-    function.
-    1. The Windows documentation is awful.
-    2. The checkstyle script should be replaced with one that actually works.
-    3. Had to switch MapViewofFileEx with VirtualAlloc because of countless errors.
-    4. Some fields in the EXCEPTION RECORD are misleading. 
 
-* Interesting facts:
-    1. For the Windows implementation I had to use an auxiliary data structure
-    because I couldn't find a way to check an illegal permissions access
-    or if a page was already mapped using the info from the EXCEPTION RECORD
-    or VirtualQuery.
-    2. No need to memset an entire page if it resides outside the file size
-    range. VirtualAlloc guarantees that a page will be zeroed if we use the 
-    MEM_COMMIT and MEM_RESERVE flags.
+1. It was actually a bit easier to implement the homework with WIN32 functions,
+because everything is a HANDLE and WaitForSingleObject works for both semaphores
+and threads.
+2. Just because it worked one time, it doesn't mean the second time would still
+work. Debugging a multithreaded application is quite hard.
 
 How should I compile and run this library?
 -
+
 #### Linux ####
+
 ```
 make
 ```
@@ -109,11 +97,13 @@ make -f Makefile.checker
 
 In order to run a specific test, pass the test number (1 .. 20) to the run_test
 executable:
+
 ```
 LD_LIBRARY_PATH=. ./_test/run_test 1
 ```
 
 #### Windows ####
+
 ```
 nmake -f Makefile (PowerShell)
 ```
@@ -126,12 +116,14 @@ make -f Makefile.checker (Cygwin)
 
 In order to run a specific test, pass the test number (1 .. 20) to the
 run_test.exe executable:
+
 ```
 ./_test/run_test.exe 1
 ```
 
 Resources
 -
+
 * Operating Systems official GitHub: [Makefile and file skeleton](https://github.com/systems-cs-pub-ro/so/tree/master/assignments/4-scheduler)
 * Lab 8: [Linux Threads](https://ocw.cs.pub.ro/courses/so/laboratoare/laborator-08)
 * Lab 9: [Windows Threads](https://ocw.cs.pub.ro/courses/so/laboratoare/laborator-09)
@@ -143,11 +135,12 @@ Resources
 * Operating Systems Concepts: [Book](https://cloudflare-ipfs.com/ipfs/bafykbzaceavsju4l3yz7sbukzvmdxvaxtxvtceimf5hl2oesunfqaik3tlthq?filename=Abraham%20Silberschatz%2C%20Greg%20Gagne%2C%20Peter%20B.%20Galvin%20-%20Operating%20System%20Concepts-Wiley%20%282018%29.pdf)
 * Windows System Programming: [Book](https://doc.lagout.org/operating%20system%20/Windows/Windows%20System%20Programming.pdf)
 * The Linux Programming Interface: [Book](https://sciencesoftcode.files.wordpress.com/2018/12/the-linux-programming-interface-michael-kerrisk-1.pdf)
-* LinkedList (this is my git for homework 1): [LinkedList](https://github.com/Cristi29P/c-preprocessor.git) 
+* LinkedList (this is my git for homework 1): [LinkedList](https://github.com/Cristi29P/c-preprocessor.git)
 * DS: [Heap concepts](https://ocw.cs.pub.ro/courses/sd-ca/laboratoare/lab-09)
   
 Git
 -
-* Link: [thread-scheduler](https://github.com/Cristi29P/thread-scheduler.git) 
+
+* Link: [thread-scheduler](https://github.com/Cristi29P/thread-scheduler.git)
 repository should be public after the 21st of May. Otherwise, please contact me
 on Microsoft Teams or e-mail.
